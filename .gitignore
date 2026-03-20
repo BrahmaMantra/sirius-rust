@@ -22,6 +22,5 @@
 tmp/
 build/
 
-# Claude memory
-.memory/
+# Claude config (not memory)
 .claude/
