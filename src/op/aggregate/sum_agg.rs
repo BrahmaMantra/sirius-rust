@@ -6,8 +6,7 @@
 use crate::ext_api;
 use crate::ffi::sys;
 use crate::gpu_columns;
-use crate::op::aggregate::sum::SumFunction;
-use crate::op::aggregate::traits::{AggregateFunction, AggregateValue};
+use crate::op::aggregate::traits::AggregateValue;
 
 #[repr(C)]
 pub(crate) struct SumState {
@@ -50,28 +49,15 @@ pub(crate) unsafe extern "C" fn update(
     };
 
     let ctx = crate::sirius_context::global();
-
-    // GPU 路径
-    if let Some(backend) = ctx.gpu_backend() {
-        if let Ok(val) = backend.gpu_sum(&col) {
-            // 所有行映射到同一个 state（无 GROUP BY 时 states[0] == states[i]）
-            let state_ptr = *states as *mut SumState;
-            merge_value(state_ptr, &val);
-            return;
-        }
-    }
-
-    // CPU 路径
-    let func = SumFunction;
-    let mut agg_state = func.create_state();
-    if func.update(agg_state.as_mut(), &col).is_ok() {
-        if let Ok(val) = func.finalize(agg_state.as_ref()) {
+    match ctx.executor().sum(&col) {
+        Ok(val) => {
             let state_ptr = *states as *mut SumState;
             merge_value(state_ptr, &val);
         }
-    } else {
-        let msg = std::ffi::CString::new("sirius_sum update failed").unwrap();
-        ext_api::duckdb_aggregate_function_set_error(info, msg.as_ptr());
+        Err(_) => {
+            let msg = std::ffi::CString::new("sirius_sum update failed").unwrap();
+            ext_api::duckdb_aggregate_function_set_error(info, msg.as_ptr());
+        }
     }
 }
 

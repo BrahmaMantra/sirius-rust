@@ -1,9 +1,10 @@
 //! 全局执行上下文 — 对应 sirius/src/sirius_context.cpp
 //!
-//! 管理 GPU 后端、聚合注册表等全局状态。
+//! 构造时根据 GPU 可用性选择 executor 实现，
+//! 不支持 GPU 时回退到 DuckDB 原生（不做 CPU fallback）。
 
-use crate::cuda::backend::GpuBackend;
-use crate::op::aggregate::AggregateRegistry;
+use crate::executor::mock_gpu::MockGpuExecutor;
+use crate::executor::AggregateExecutor;
 use std::sync::OnceLock;
 
 /// 全局单例
@@ -15,51 +16,34 @@ pub fn global() -> &'static SiriusContext {
 
 /// Sirius 全局上下文
 pub struct SiriusContext {
-    aggregate_registry: AggregateRegistry,
-    gpu_backend: Option<Box<dyn GpuBackend>>,
+    executor: Box<dyn AggregateExecutor>,
 }
 
 impl SiriusContext {
     pub fn new() -> Self {
-        let mut ctx = Self {
-            aggregate_registry: AggregateRegistry::new(),
-            gpu_backend: None,
-        };
-        ctx.try_init_gpu();
-        ctx
+        let executor = Self::detect_executor();
+        Self { executor }
     }
 
-    /// 使用指定的 GPU 后端（用于测试）
-    pub fn with_backend(backend: Box<dyn GpuBackend>) -> Self {
-        Self {
-            aggregate_registry: AggregateRegistry::new(),
-            gpu_backend: Some(backend),
-        }
+    /// 使用指定的 executor（用于测试）
+    pub fn with_executor(executor: Box<dyn AggregateExecutor>) -> Self {
+        Self { executor }
     }
 
-    fn try_init_gpu(&mut self) {
+    fn detect_executor() -> Box<dyn AggregateExecutor> {
         #[cfg(feature = "gpu")]
         {
-            match crate::gpu_context::GpuContext::try_init() {
-                Ok(_gpu_ctx) => {
-                    // TODO: 创建 CudaBackend 包装真实 GPU
-                    // self.gpu_backend = Some(Box::new(CudaBackend::new(gpu_ctx)));
-                }
-                Err(_) => {}
+            if let Ok(_gpu_ctx) = crate::gpu_context::GpuContext::try_init() {
+                // TODO: 创建真正的 GpuExecutor
+                // return Box::new(GpuExecutor::new(gpu_ctx));
             }
         }
+
+        Box::new(MockGpuExecutor::new())
     }
 
-    pub fn is_gpu_available(&self) -> bool {
-        self.gpu_backend.is_some()
-    }
-
-    pub fn gpu_backend(&self) -> Option<&dyn GpuBackend> {
-        self.gpu_backend.as_deref()
-    }
-
-    pub fn aggregate_registry(&self) -> &AggregateRegistry {
-        &self.aggregate_registry
+    pub fn executor(&self) -> &dyn AggregateExecutor {
+        self.executor.as_ref()
     }
 }
 

@@ -1,6 +1,6 @@
 use sirius_rust::data::column::Column;
 use sirius_rust::data::types::DataType;
-use sirius_rust::gpu_executor::execute_aggregate;
+use sirius_rust::executor::AggregateExecutor;
 use sirius_rust::op::aggregate::count::{CountFunction, CountStarFunction};
 use sirius_rust::op::aggregate::traits::AggregateFunction as _;
 use sirius_rust::SiriusContext;
@@ -8,37 +8,29 @@ use sirius_rust::SiriusContext;
 #[test]
 fn test_count_large_dataset() {
     let ctx = SiriusContext::new();
-    let func = CountFunction;
     let col = Column::from_i64((1..=100_000).collect());
-    let result = execute_aggregate(&ctx, &func, &col).unwrap();
-    assert_eq!(result.as_i64(), Some(100_000));
+    assert_eq!(ctx.executor().count(&col).unwrap().as_i64(), Some(100_000));
 }
 
 #[test]
 fn test_count_star_includes_nulls() {
     let ctx = SiriusContext::new();
-    let func = CountStarFunction;
     let col = Column::from_raw_with_validity(DataType::Int32, vec![0u8; 4 * 5], vec![0b10101u64], 5);
-    let result = execute_aggregate(&ctx, &func, &col).unwrap();
-    assert_eq!(result.as_i64(), Some(5));
+    assert_eq!(ctx.executor().count_star(&col).unwrap().as_i64(), Some(5));
 }
 
 #[test]
 fn test_count_excludes_nulls() {
     let ctx = SiriusContext::new();
-    let func = CountFunction;
     let col = Column::from_raw_with_validity(DataType::Int32, vec![0u8; 4 * 5], vec![0b10101u64], 5);
-    let result = execute_aggregate(&ctx, &func, &col).unwrap();
-    assert_eq!(result.as_i64(), Some(3));
+    assert_eq!(ctx.executor().count(&col).unwrap().as_i64(), Some(3));
 }
 
 #[test]
 fn test_count_all_nulls() {
     let ctx = SiriusContext::new();
-    let func = CountFunction;
     let col = Column::from_raw_with_validity(DataType::Int32, vec![0u8; 4 * 3], vec![0u64], 3);
-    let result = execute_aggregate(&ctx, &func, &col).unwrap();
-    assert_eq!(result.as_i64(), Some(0));
+    assert_eq!(ctx.executor().count(&col).unwrap().as_i64(), Some(0));
 }
 
 #[test]

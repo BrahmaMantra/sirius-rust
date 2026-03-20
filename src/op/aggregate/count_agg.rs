@@ -5,8 +5,7 @@
 use crate::ext_api;
 use crate::ffi::sys;
 use crate::gpu_columns;
-use crate::op::aggregate::count::CountFunction;
-use crate::op::aggregate::traits::{AggregateFunction, AggregateValue};
+use crate::op::aggregate::traits::AggregateValue;
 
 #[repr(C)]
 pub(crate) struct CountState {
@@ -41,27 +40,16 @@ pub(crate) unsafe extern "C" fn update(
     };
 
     let ctx = crate::sirius_context::global();
-
-    // GPU 路径
-    if let Some(backend) = ctx.gpu_backend() {
-        if let Ok(AggregateValue::Int64(v)) = backend.gpu_count(&col) {
-            let state_ptr = *states as *mut CountState;
-            (*state_ptr).count += v;
-            return;
-        }
-    }
-
-    // CPU 路径
-    let func = CountFunction;
-    let mut agg_state = func.create_state();
-    if func.update(agg_state.as_mut(), &col).is_ok() {
-        if let Ok(AggregateValue::Int64(v)) = func.finalize(agg_state.as_ref()) {
+    match ctx.executor().count(&col) {
+        Ok(AggregateValue::Int64(v)) => {
             let state_ptr = *states as *mut CountState;
             (*state_ptr).count += v;
         }
-    } else {
-        let msg = std::ffi::CString::new("sirius_count update failed").unwrap();
-        ext_api::duckdb_aggregate_function_set_error(info, msg.as_ptr());
+        Ok(_) => {}
+        Err(_) => {
+            let msg = std::ffi::CString::new("sirius_count update failed").unwrap();
+            ext_api::duckdb_aggregate_function_set_error(info, msg.as_ptr());
+        }
     }
 }
 

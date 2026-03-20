@@ -35,6 +35,9 @@ impl AggregateRegistry {
         self.register(Box::new(sum::SumFunction));
         self.register(Box::new(count::CountFunction));
         self.register(Box::new(count::CountStarFunction));
+        self.register(Box::new(avg::AvgFunction));
+        self.register(Box::new(min::MinFunction));
+        self.register(Box::new(max::MaxFunction));
     }
 
     pub fn register(&mut self, func: Box<dyn AggregateFunction>) {
@@ -62,6 +65,8 @@ mod tests {
         assert!(registry.get("sum").is_some());
         assert!(registry.get("count").is_some());
         assert!(registry.get("count_star").is_some());
-        assert!(registry.get("avg").is_none());
+        assert!(registry.get("avg").is_some());
+        assert!(registry.get("min").is_some());
+        assert!(registry.get("max").is_some());
     }
 }

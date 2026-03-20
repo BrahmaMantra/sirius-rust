@@ -20,5 +20,7 @@ fn test_registry_lookup_and_execute() {
 fn test_registry_unknown_function() {
     let registry = AggregateRegistry::new();
     assert!(registry.get("unknown_func").is_none());
-    assert!(registry.get("avg").is_none());
+    assert!(registry.get("avg").is_some());
+    assert!(registry.get("min").is_some());
+    assert!(registry.get("max").is_some());
 }
