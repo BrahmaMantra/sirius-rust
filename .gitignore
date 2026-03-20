@@ -1,0 +1,27 @@
+/target
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+*.so
+*.dll
+*.dylib
+*.duckdb_extension
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Environment
+.env
+.env.local
+
+tmp/
+build/
+
+# Claude memory
+.memory/
+.claude/

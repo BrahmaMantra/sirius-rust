@@ -1,0 +1,31 @@
+[package]
+name = "sirius-rust"
+version = "0.1.0"
+edition = "2021"
+description = "GPU-accelerated aggregate functions for DuckDB, inspired by sirius"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["link-duckdb"]
+gpu = ["dep:cudarc"]
+link-duckdb = []
+
+[dependencies]
+# GPU (optional)
+cudarc = { version = "0.12", optional = true }
+
+# Utilities
+thiserror = "2"
+num-traits = "0.2"
+
+[build-dependencies]
+# bindgen 从 DuckDB C headers 生成 Rust FFI 绑定
+bindgen = "0.71"
+cc = "1"
+
+[profile.release]
+lto = true
+strip = true
