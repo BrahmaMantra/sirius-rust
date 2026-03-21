@@ -13,6 +13,9 @@ pub mod min;
 pub mod register;
 pub(crate) mod sum_agg;
 pub(crate) mod count_agg;
+pub(crate) mod avg_agg;
+pub(crate) mod min_agg;
+pub(crate) mod max_agg;
 
 use std::collections::HashMap;
 use traits::AggregateFunction;

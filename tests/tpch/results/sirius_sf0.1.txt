@@ -1,0 +1,26 @@
+TPC-H Sirius Benchmark  SF=0.1  Sat 21 Mar 2026 01:59:42 PM CST
+Extension: /home/fanzhou.520/sirius-rust/build/sirius_rust.duckdb_extension
+========================================
+Q01: 31 ms
+Q02: 32 ms
+Q03: 32 ms
+Q04: 32 ms
+Q05: 35 ms
+Q06: 22 ms
+Q07: 32 ms
+Q08: 30 ms
+Q09: 38 ms
+Q10: 55 ms
+Q11: 25 ms
+Q12: 27 ms
+Q13: 45 ms
+Q14: 25 ms
+Q15: 25 ms
+Q16: SKIP (COUNT DISTINCT not supported)
+Q17: 28 ms
+Q18: 39 ms
+Q19: 27 ms
+Q20: 31 ms
+Q21: 44 ms
+Q22: 28 ms
+========================================

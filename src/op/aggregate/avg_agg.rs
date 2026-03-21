@@ -1,27 +1,24 @@
-//! sirius_count 的 DuckDB C 回调
-//!
-//! 关键：duckdb_aggregate_state 直接 cast 为 state 指针，不通过 internal_ptr。
+//! sirius_avg 的 DuckDB C 回调
 
 use crate::ext_api;
 use crate::ffi::sys;
 use crate::gpu_columns;
-use crate::op::aggregate::traits::AggregateValue;
 
 #[repr(C)]
-pub(crate) struct CountState {
+pub(crate) struct AvgState {
+    sum: f64,
     count: i64,
 }
 
 pub(crate) unsafe extern "C" fn state_size(_info: sys::duckdb_function_info) -> sys::idx_t {
-    std::mem::size_of::<CountState>() as sys::idx_t
+    std::mem::size_of::<AvgState>() as sys::idx_t
 }
 
 pub(crate) unsafe extern "C" fn init(
     _info: sys::duckdb_function_info,
     state: sys::duckdb_aggregate_state,
 ) {
-    let ptr = state as *mut CountState;
-    std::ptr::write(ptr, CountState { count: 0 });
+    std::ptr::write(state as *mut AvgState, AvgState { sum: 0.0, count: 0 });
 }
 
 pub(crate) unsafe extern "C" fn update(
@@ -40,14 +37,16 @@ pub(crate) unsafe extern "C" fn update(
     };
 
     let ctx = crate::sirius_context::global();
-    match ctx.executor().count(&col) {
-        Ok(AggregateValue::Int64(v)) => {
-            let state_ptr = *states as *mut CountState;
-            (*state_ptr).count += v;
+    match ctx.executor().avg(&col) {
+        Ok(crate::op::aggregate::traits::AggregateValue::Float64(v)) => {
+            let state_ptr = *states as *mut AvgState;
+            let valid = col.valid_count() as i64;
+            (*state_ptr).sum += v * valid as f64;
+            (*state_ptr).count += valid;
         }
         Ok(_) => {}
         Err(_) => {
-            let msg = std::ffi::CString::new("sirius_count update failed").unwrap();
+            let msg = std::ffi::CString::new("sirius_avg update failed").unwrap();
             ext_api::duckdb_aggregate_function_set_error(info, msg.as_ptr());
         }
     }
@@ -60,24 +59,11 @@ pub(crate) unsafe extern "C" fn combine(
     count: sys::idx_t,
 ) {
     for i in 0..count as usize {
-        let src = *source.add(i) as *const CountState;
-        let tgt = *target.add(i) as *mut CountState;
+        let src = *source.add(i) as *const AvgState;
+        let tgt = *target.add(i) as *mut AvgState;
+        (*tgt).sum += (*src).sum;
         (*tgt).count += (*src).count;
     }
-}
-
-/// count(*) 专用 update — 直接累加 chunk 的行数，不读任何列
-pub(crate) unsafe extern "C" fn update_star(
-    _info: sys::duckdb_function_info,
-    input: sys::duckdb_data_chunk,
-    states: *mut sys::duckdb_aggregate_state,
-) {
-    let row_count = ext_api::duckdb_data_chunk_get_size(input);
-    if row_count == 0 {
-        return;
-    }
-    let state_ptr = *states as *mut CountState;
-    (*state_ptr).count += row_count as i64;
 }
 
 pub(crate) unsafe extern "C" fn finalize(
@@ -88,8 +74,12 @@ pub(crate) unsafe extern "C" fn finalize(
     offset: sys::idx_t,
 ) {
     for i in 0..count as usize {
-        let state = *source.add(i) as *const CountState;
+        let state = *source.add(i) as *const AvgState;
         let idx = (offset as usize + i) as u64;
-        gpu_columns::write_i64_to_vector(result, idx, (*state).count);
+        if (*state).count == 0 {
+            gpu_columns::set_vector_null(result, idx);
+        } else {
+            gpu_columns::write_f64_to_vector(result, idx, (*state).sum / (*state).count as f64);
+        }
     }
 }

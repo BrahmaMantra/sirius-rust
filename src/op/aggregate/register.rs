@@ -2,7 +2,7 @@
 
 use crate::ext_api;
 use crate::ffi::sys;
-use super::{count_agg, sum_agg};
+use super::{avg_agg, count_agg, max_agg, min_agg, sum_agg};
 
 /// 注册 sirius_sum（多类型重载）
 ///
@@ -58,6 +58,31 @@ pub unsafe fn register_count(conn: sys::duckdb_connection) {
     ext_api::duckdb_destroy_aggregate_function_set(&mut { set });
 }
 
+/// 注册 sirius_count_star()（无参数，计所有行）
+pub unsafe fn register_count_star(conn: sys::duckdb_connection) {
+    let name = std::ffi::CString::new("sirius_count_star").unwrap();
+    let set = ext_api::duckdb_create_aggregate_function_set(name.as_ptr());
+
+    let func = ext_api::duckdb_create_aggregate_function();
+    ext_api::duckdb_aggregate_function_set_name(func, name.as_ptr());
+    let return_lt = ext_api::duckdb_create_logical_type(sys::DUCKDB_TYPE_DUCKDB_TYPE_BIGINT);
+    ext_api::duckdb_aggregate_function_set_return_type(func, return_lt);
+    ext_api::duckdb_aggregate_function_set_special_handling(func);
+    ext_api::duckdb_aggregate_function_set_functions(
+        func,
+        Some(count_agg::state_size),
+        Some(count_agg::init),
+        Some(count_agg::update_star),
+        Some(count_agg::combine),
+        Some(count_agg::finalize),
+    );
+    ext_api::duckdb_add_aggregate_function_to_set(set, func);
+    ext_api::duckdb_register_aggregate_function_set(conn, set);
+    ext_api::duckdb_destroy_logical_type(&mut { return_lt });
+    ext_api::duckdb_destroy_aggregate_function(&mut { func });
+    ext_api::duckdb_destroy_aggregate_function_set(&mut { set });
+}
+
 unsafe fn add_sum_overload(
     set: sys::duckdb_aggregate_function_set,
     name: *const std::os::raw::c_char,
@@ -87,6 +112,125 @@ unsafe fn add_sum_overload(
     ext_api::duckdb_destroy_logical_type(&mut { input_lt });
     ext_api::duckdb_destroy_logical_type(&mut { return_lt });
     ext_api::duckdb_destroy_aggregate_function(&mut { func });
+}
+
+/// 注册 sirius_avg（数值类型 → DOUBLE）
+pub unsafe fn register_avg(conn: sys::duckdb_connection) {
+    let name = std::ffi::CString::new("sirius_avg").unwrap();
+    let set = ext_api::duckdb_create_aggregate_function_set(name.as_ptr());
+
+    for &ty in &[
+        sys::DUCKDB_TYPE_DUCKDB_TYPE_TINYINT,
+        sys::DUCKDB_TYPE_DUCKDB_TYPE_SMALLINT,
+        sys::DUCKDB_TYPE_DUCKDB_TYPE_INTEGER,
+        sys::DUCKDB_TYPE_DUCKDB_TYPE_BIGINT,
+        sys::DUCKDB_TYPE_DUCKDB_TYPE_FLOAT,
+        sys::DUCKDB_TYPE_DUCKDB_TYPE_DOUBLE,
+    ] {
+        let func = ext_api::duckdb_create_aggregate_function();
+        ext_api::duckdb_aggregate_function_set_name(func, name.as_ptr());
+        let input_lt = ext_api::duckdb_create_logical_type(ty);
+        let return_lt = ext_api::duckdb_create_logical_type(sys::DUCKDB_TYPE_DUCKDB_TYPE_DOUBLE);
+        ext_api::duckdb_aggregate_function_add_parameter(func, input_lt);
+        ext_api::duckdb_aggregate_function_set_return_type(func, return_lt);
+        ext_api::duckdb_aggregate_function_set_functions(
+            func,
+            Some(avg_agg::state_size),
+            Some(avg_agg::init),
+            Some(avg_agg::update),
+            Some(avg_agg::combine),
+            Some(avg_agg::finalize),
+        );
+        ext_api::duckdb_add_aggregate_function_to_set(set, func);
+        ext_api::duckdb_destroy_logical_type(&mut { input_lt });
+        ext_api::duckdb_destroy_logical_type(&mut { return_lt });
+        ext_api::duckdb_destroy_aggregate_function(&mut { func });
+    }
+
+    ext_api::duckdb_register_aggregate_function_set(conn, set);
+    ext_api::duckdb_destroy_aggregate_function_set(&mut { set });
+}
+
+/// 注册 sirius_min（返回与输入同类型）
+pub unsafe fn register_min(conn: sys::duckdb_connection) {
+    let name = std::ffi::CString::new("sirius_min").unwrap();
+    let set = ext_api::duckdb_create_aggregate_function_set(name.as_ptr());
+
+    for &ty in &[
+        sys::DUCKDB_TYPE_DUCKDB_TYPE_INTEGER,
+        sys::DUCKDB_TYPE_DUCKDB_TYPE_BIGINT,
+        sys::DUCKDB_TYPE_DUCKDB_TYPE_FLOAT,
+        sys::DUCKDB_TYPE_DUCKDB_TYPE_DOUBLE,
+    ] {
+        let func = ext_api::duckdb_create_aggregate_function();
+        ext_api::duckdb_aggregate_function_set_name(func, name.as_ptr());
+        let input_lt = ext_api::duckdb_create_logical_type(ty);
+        let return_lt = ext_api::duckdb_create_logical_type(
+            if ty == sys::DUCKDB_TYPE_DUCKDB_TYPE_FLOAT || ty == sys::DUCKDB_TYPE_DUCKDB_TYPE_DOUBLE {
+                sys::DUCKDB_TYPE_DUCKDB_TYPE_DOUBLE
+            } else {
+                sys::DUCKDB_TYPE_DUCKDB_TYPE_BIGINT
+            }
+        );
+        ext_api::duckdb_aggregate_function_add_parameter(func, input_lt);
+        ext_api::duckdb_aggregate_function_set_return_type(func, return_lt);
+        ext_api::duckdb_aggregate_function_set_functions(
+            func,
+            Some(min_agg::state_size),
+            Some(min_agg::init),
+            Some(min_agg::update),
+            Some(min_agg::combine),
+            Some(min_agg::finalize),
+        );
+        ext_api::duckdb_add_aggregate_function_to_set(set, func);
+        ext_api::duckdb_destroy_logical_type(&mut { input_lt });
+        ext_api::duckdb_destroy_logical_type(&mut { return_lt });
+        ext_api::duckdb_destroy_aggregate_function(&mut { func });
+    }
+
+    ext_api::duckdb_register_aggregate_function_set(conn, set);
+    ext_api::duckdb_destroy_aggregate_function_set(&mut { set });
+}
+
+/// 注册 sirius_max（返回与输入同类型）
+pub unsafe fn register_max(conn: sys::duckdb_connection) {
+    let name = std::ffi::CString::new("sirius_max").unwrap();
+    let set = ext_api::duckdb_create_aggregate_function_set(name.as_ptr());
+
+    for &ty in &[
+        sys::DUCKDB_TYPE_DUCKDB_TYPE_INTEGER,
+        sys::DUCKDB_TYPE_DUCKDB_TYPE_BIGINT,
+        sys::DUCKDB_TYPE_DUCKDB_TYPE_FLOAT,
+        sys::DUCKDB_TYPE_DUCKDB_TYPE_DOUBLE,
+    ] {
+        let func = ext_api::duckdb_create_aggregate_function();
+        ext_api::duckdb_aggregate_function_set_name(func, name.as_ptr());
+        let input_lt = ext_api::duckdb_create_logical_type(ty);
+        let return_lt = ext_api::duckdb_create_logical_type(
+            if ty == sys::DUCKDB_TYPE_DUCKDB_TYPE_FLOAT || ty == sys::DUCKDB_TYPE_DUCKDB_TYPE_DOUBLE {
+                sys::DUCKDB_TYPE_DUCKDB_TYPE_DOUBLE
+            } else {
+                sys::DUCKDB_TYPE_DUCKDB_TYPE_BIGINT
+            }
+        );
+        ext_api::duckdb_aggregate_function_add_parameter(func, input_lt);
+        ext_api::duckdb_aggregate_function_set_return_type(func, return_lt);
+        ext_api::duckdb_aggregate_function_set_functions(
+            func,
+            Some(max_agg::state_size),
+            Some(max_agg::init),
+            Some(max_agg::update),
+            Some(max_agg::combine),
+            Some(max_agg::finalize),
+        );
+        ext_api::duckdb_add_aggregate_function_to_set(set, func);
+        ext_api::duckdb_destroy_logical_type(&mut { input_lt });
+        ext_api::duckdb_destroy_logical_type(&mut { return_lt });
+        ext_api::duckdb_destroy_aggregate_function(&mut { func });
+    }
+
+    ext_api::duckdb_register_aggregate_function_set(conn, set);
+    ext_api::duckdb_destroy_aggregate_function_set(&mut { set });
 }
 
 unsafe fn add_count_overload(

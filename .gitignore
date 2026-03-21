@@ -24,3 +24,5 @@ build/
 
 # Claude config (not memory)
 .claude/
+
+tests/tpch/data/*

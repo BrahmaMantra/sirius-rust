@@ -54,6 +54,10 @@ pub unsafe extern "C" fn sirius_rust_init_c_api(
     // 注册聚合函数
     register::register_sum(conn);
     register::register_count(conn);
+    register::register_count_star(conn);
+    register::register_avg(conn);
+    register::register_min(conn);
+    register::register_max(conn);
 
     ext_api::duckdb_disconnect(&mut conn);
     true
@@ -75,6 +79,10 @@ pub unsafe extern "C" fn sirius_rust_init(db: sys::duckdb_database) {
 
     register::register_sum(conn);
     register::register_count(conn);
+    register::register_count_star(conn);
+    register::register_avg(conn);
+    register::register_min(conn);
+    register::register_max(conn);
 
     ext_api::duckdb_disconnect(&mut conn);
 }

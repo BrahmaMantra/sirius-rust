@@ -65,12 +65,43 @@ SQL → DuckDB → Substrait Plan → sirius-rust → GPU 执行 (fallback CPU) 
 
 **测试集**：TPC-H 多规模 SF0.1 / SF0.5 / SF1 / SF5 / SF10
 **硬件**：Intel i5 + RTX 3050 Ti (4GB VRAM)
-**对比组**：DuckDB 原生 / sirius-rust CPU / sirius-rust GPU
+**对比组**：DuckDB 原生 / sirius-rust GPU
 
 关键点：
 - SF1 在学术界算小数据集，必须多规模展示可扩展性
 - SF10 (7.2GB) 超出 VRAM，需实现分批传输（Host→Device 分块 + 部分归约 + 合并）
 - 论文画 3 张图：SF vs 执行时间、SF vs 加速比、分批传输分析
+
+### Benchmark 框架
+
+脚本位于 `tests/tpch/`，完整流程：
+
+```bash
+# 1. 生成数据 + 跑 native baseline（首次运行会自动生成 .duckdb 文件）
+./tests/tpch/run_native.sh [sf] [runs]      # 默认 sf=0.1, runs=5
+
+# 2. 生成 sirius 版本查询（把 sum/count 等替换为 sirius_sum/sirius_count 等）
+./tests/tpch/gen_sirius_queries.sh
+
+# 3. 构建扩展
+just build_ext
+
+# 4. 跑 sirius benchmark
+./tests/tpch/run_sirius.sh [sf] [runs]
+
+# 5. 对比结果
+./tests/tpch/compare.sh [sf]
+```
+
+**结果文件**：`tests/tpch/results/native_sf{SF}.txt` / `sirius_sf{SF}.txt`
+
+**数据文件**：`tests/tpch/data/tpch_sf{SF}.duckdb`（DuckDB 内置 `CALL dbgen(sf=N)` 生成）
+
+**跑分设计**：每条查询跑 N 次（默认 5），取中位数，输出所有单次耗时，消除 OS 调度噪音
+
+**跳过查询**：Q16（使用 COUNT DISTINCT，不支持，使用 DuckDB 原生）
+
+**sirius 支持的聚合函数**：`sirius_sum`, `sirius_count`, `sirius_count_star`, `sirius_avg`, `sirius_min`, `sirius_max`
 
 ## 编码规范
 
