@@ -23,9 +23,9 @@ build:
 build_release:
   cargo build --release
 
-# GPU release 构建
+# GPU release 构建（清除 CXX 避免 nvcc 拒绝 clang >= 12）
 build_gpu:
-  cargo build --release --features gpu
+  CXX= cargo build --release --features gpu
 
 # 构建可加载扩展（.duckdb_extension）
 build_ext:
@@ -33,7 +33,7 @@ build_ext:
 
 # GPU 模式构建可加载扩展
 build_ext_gpu:
-  bash scripts/build_extension.sh --gpu
+  CXX= bash scripts/build_extension.sh --gpu
 
 # ============================================================
 # Test
@@ -57,7 +57,7 @@ test_mock:
 
 # GPU 测试（需要 CUDA）
 test_gpu:
-  cargo test --features gpu
+  CXX= cargo test --features gpu
 
 # 运行指定测试
 test_one name:

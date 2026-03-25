@@ -1,7 +1,7 @@
 //! Host↔Device 数据传输
 
 use crate::error::{Result, SiriusError};
-use cudarc::driver::{CudaDevice, CudaSlice, DeviceSlice};
+use cudarc::driver::{CudaDevice, CudaSlice};
 use std::sync::Arc;
 
 pub struct GpuMemory {

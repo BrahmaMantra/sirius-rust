@@ -145,7 +145,7 @@ fn main() {
             .flag("-gencode=arch=compute_70,code=sm_70") // Volta
             .flag("-gencode=arch=compute_75,code=sm_75") // Turing
             .flag("-gencode=arch=compute_80,code=sm_80") // Ampere
-            .flag("-gencode=arch=compute_86,code=sm_86") // Ampere (3050 Ti)
+            .flag("-gencode=arch=compute_86,code=sm_86") // Ampere
             .file("src/cuda/kernels/sum.cu")
             .file("src/cuda/kernels/count.cu")
             .compile("sirius_kernels");

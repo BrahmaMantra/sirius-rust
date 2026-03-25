@@ -5,6 +5,7 @@ use crate::error::{Result, SiriusError};
 use crate::gpu_context::GpuContext;
 use crate::memory::GpuMemory;
 use crate::op::aggregate::traits::AggregateValue;
+use cudarc::driver::LaunchAsync;
 
 const BLOCK_SIZE: u32 = 256;
 
